@@ -2,7 +2,6 @@ import { app, LOGGER } from './firebaseAdmin';
 import { firebaseFunctions as functions } from './firebaseAdmin';
 
 import { determineSubscriptionState } from './subscriptions';
-import { subscribeTestUser } from './test/setupEmulators';
 
 const appFirestore = app.firestore();
 
