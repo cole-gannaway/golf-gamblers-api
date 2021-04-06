@@ -1,11 +1,10 @@
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
-import { FirebaseConfig } from './config/firebase.config';
-import { updateSubscriptionState } from './subscriptions';
+import { app, LOGGER } from './firebaseAdmin';
+import { firebaseFunctions as functions } from './firebaseAdmin';
 
-const app = admin.initializeApp(FirebaseConfig);
+import { determineSubscriptionState } from './subscriptions';
+import { subscribeTestUser } from './test/setupEmulators';
+
 const appFirestore = app.firestore();
-const LOGGER = functions.logger;
 
 /**
  * This method listens for created, updated, and deleted subscriptions from the Stripe extension.
@@ -20,39 +19,71 @@ export const subscriptionStateListener = functions.firestore
     // call update on create, update, and delete
     const after = change.after;
     const subscription = after.data();
-    updateSubscriptionState(LOGGER, appFirestore, userId, subscription);
 
-    // return okay
+    // determine subscription level from product
+    const subscriptionState = determineSubscriptionState(subscription);
+
+    // call update
+    appFirestore
+      .collection('users')
+      .doc(userId)
+      .collection('private')
+      .doc('account-data')
+      .set({ subscriptionState: subscriptionState });
     return 200;
   });
 
-// Development Code below
+/**
+ * This method listens for new users to be created and stores both
+ * public and private data under the users document.
+ */
+export const newUserListener = functions.auth.user().onCreate(async (user) => {
+  // create data
+  const publicAccountData = {
+    name: user.displayName,
+  };
+
+  const privateAccountData = {
+    subscriptionState: 'None',
+    email: user.email,
+  };
+
+  // run atomicly
+  const batch = appFirestore.batch();
+
+  // set public account data
+  const publicRef = appFirestore
+    .collection('users')
+    .doc(user.uid)
+    .collection('public')
+    .doc('account-data');
+
+  batch.set(publicRef, publicAccountData);
+
+  // set private account data
+  const privateRef = appFirestore
+    .collection('users')
+    .doc(user.uid)
+    .collection('private')
+    .doc('account-data');
+
+  batch.set(privateRef, privateAccountData);
+
+  // commit batch
+  batch.commit();
+
+  return 200;
+});
 
 /**
- * WARNING: This function should not actually be deployed, it is a fail safe if the
- * database gets out of sync
- *
- * This method runs a batch job on all users and updates their subscription states
- * to be reflective of Stripe's active subscriptions
+ * This method listens for users to be deleted and removes any data stored
+ * under the users document
  */
-// export const updateSubscriptionStateManually = functions.https.onRequest(
-//   async (request, response) => {
-//     const customersSnap = await appFirestore.collection('customers').get();
-//     customersSnap.forEach(async (customerSnap) => {
-//       const userId = customerSnap.id;
-//       const subscriptionsSnap = await customerSnap.ref
-//         .collection('subscriptions')
-//         .get();
-//       subscriptionsSnap.forEach((subscriptionSnap) => {
-//         const subscription = subscriptionSnap.data();
-//         updateSubscriptionState(LOGGER, appFirestore, userId, subscription);
-//       });
-//     });
-//     response.send('Succesful');
-//   }
-// );
-
-// export const helloWorld = functions.https.onRequest((request, response) => {
-//   functions.logger.info('Hello logs!', { structuredData: true });
-//   response.send('Hello from Firebase!');
-// });
+export const deleteUserListener = functions.auth.user().onDelete((user) => {
+  appFirestore
+    .collection('users')
+    .doc(user.uid)
+    .delete()
+    .catch((error) => LOGGER.error(error));
+  return 200;
+});
