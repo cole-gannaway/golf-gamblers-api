@@ -1,3 +1,4 @@
+import { SubscriptionState } from 'golf-gamblers-model';
 import { StripeConfig } from './config/stripe.config';
 
 /**
@@ -9,10 +10,10 @@ import { StripeConfig } from './config/stripe.config';
  */
 export function determineSubscriptionState(
   subscription: FirebaseFirestore.DocumentData | undefined
-) {
+): SubscriptionState {
   const status = subscription?.status;
   const product = subscription?.product;
-  let subscriptionState = 'None';
+  let subscriptionState: SubscriptionState = 'None';
   if (status === 'active') {
     // make sure this product id is the Basic subscription
     if (product?.id === StripeConfig.subscription_product_key.basic) {

@@ -1,7 +1,9 @@
-import { app, LOGGER } from './firebaseAdmin';
+import { app, getCurrentTime, LOGGER } from './firebaseAdmin';
 import { firebaseFunctions as functions } from './firebaseAdmin';
 
 import { determineSubscriptionState } from './subscriptions';
+
+import { UserPrivateData, UserPublicData } from 'golf-gamblers-model';
 
 const appFirestore = app.firestore();
 
@@ -38,24 +40,21 @@ export const subscriptionStateListener = functions.firestore
  */
 export const newUserListener = functions.auth.user().onCreate(async (user) => {
   // create data
-  const publicAccountData = {
+  const publicAccountData: UserPublicData = {
     name: user.displayName,
   };
 
-  const privateAccountData = {
-    subscriptionState: 'None',
+  const privateAccountData: UserPrivateData = {
     email: user.email,
+    createdAt: getCurrentTime(),
+    subscriptionState: 'None',
   };
 
   // run atomicly
   const batch = appFirestore.batch();
 
-  // set public account data
-  const publicRef = appFirestore
-    .collection('users')
-    .doc(user.uid)
-    .collection('public')
-    .doc('account-data');
+  // set public account data will just set on the user document
+  const publicRef = appFirestore.collection('users').doc(user.uid);
 
   batch.set(publicRef, publicAccountData);
 
