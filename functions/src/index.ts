@@ -1,8 +1,7 @@
-import { app, getCurrentTime, LOGGER } from './firebaseAdmin';
+import { app, LOGGER } from './firebaseAdmin';
+import { getCurrentTime } from './utils/utils';
 import { firebaseFunctions as functions } from './firebaseAdmin';
-
 import { determineSubscriptionState } from './subscriptions';
-
 import { UserPrivateData, UserPublicData } from 'golf-gamblers-model';
 
 const appFirestore = app.firestore();
@@ -46,7 +45,7 @@ export const newUserListener = functions.auth.user().onCreate(async (user) => {
 
   const privateAccountData: UserPrivateData = {
     email: user.email,
-    createdAt: getCurrentTime(),
+    createdTime: getCurrentTime(),
     subscriptionState: 'None',
   };
 

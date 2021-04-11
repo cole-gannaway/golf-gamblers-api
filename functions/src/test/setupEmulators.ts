@@ -1,7 +1,13 @@
 import { StripeConfig } from '../config/stripe.config';
-import { app, getCurrentTime } from '../firebaseAdmin';
-
-import { Event, Course, ScoreCard, EventMetaData } from 'golf-gamblers-model';
+import { app } from '../firebaseAdmin';
+import { getCurrentTime } from '../utils/utils';
+import {
+  Event,
+  Course,
+  ScoreCard,
+  EventConfiguration,
+} from 'golf-gamblers-model';
+import { EventUser } from 'golf-gamblers-model/dist/event';
 
 const appFirestore = app.firestore();
 
@@ -15,6 +21,90 @@ export const subscribeTestUser = async (userId: string) => {
   return true;
 };
 
+/**
+ * Creates an event with users
+ */
+export async function createEvent(
+  eventId: string,
+  creatorId: string,
+  courseId: string
+) {
+  const batch = appFirestore.batch();
+
+  // create event
+  const event: Event = {
+    name: 'testEvent',
+    creatorId: creatorId,
+    createdTime: getCurrentTime(),
+  };
+
+  // set event
+  batch.set(appFirestore.collection('events').doc(eventId), event);
+
+  // configure event
+  const eventConfig: EventConfiguration = {
+    private: false,
+    state: 'IN_PROGRESS',
+    courseId: courseId,
+    numberOfHoles: 18,
+    maxBet: 5,
+    tees: 'I',
+  };
+
+  // set event configuration
+  batch.set(
+    appFirestore
+      .collection('events')
+      .doc(eventId)
+      .collection('private')
+      .doc('configuration'),
+    eventConfig
+  );
+
+  // create eventUser
+  const eventUser: EventUser = {
+    userId: creatorId,
+    eventId: eventId,
+    isAdmin: true,
+  };
+
+  const eventUserRef = appFirestore
+    .collection('event-users')
+    .doc(eventId + '-' + creatorId);
+  batch.set(eventUserRef, eventUser);
+
+  // commit all changes
+  await batch.commit();
+}
+
+/**
+ * Creates a course for events to be held at
+ */
+export async function createCourse(courseId: string) {
+  const course: Course = {
+    name: 'testCourse',
+    public: false,
+    location: {
+      city: 'Birmingham',
+      state: 'Alabama',
+      country: 'United States',
+    },
+    createdTime: getCurrentTime(),
+  };
+  await appFirestore.collection('courses').doc(courseId).set(course);
+}
+
+/**
+ * Creates a course for events to be held at
+ */
+export async function createScorecard(scorecardId: string, userId: string) {
+  const scorecard: ScoreCard = {
+    userId: userId,
+    createdTime: getCurrentTime(),
+  };
+  await appFirestore.collection('scorecards').doc(scorecardId).set(scorecard);
+}
+
 /////////////////////////////////////////////////////////////////////////////
 ///////////////////////Helper Methods Below//////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -22,10 +112,7 @@ export const subscribeTestUser = async (userId: string) => {
 /**
  * Creates a user subscription to the product
  */
-export const subscribeUserToProduct = async (
-  userId: string,
-  productId: string
-) => {
+const subscribeUserToProduct = async (userId: string, productId: string) => {
   const productRef = appFirestore.collection('products').doc(productId);
   appFirestore
     .collection('customers')
@@ -41,83 +128,12 @@ export const subscribeUserToProduct = async (
 /**
  * Creates a product for users to subscribe to
  */
-export const createBasicProduct = async (productId: string) => {
+const createBasicProduct = async (productId: string) => {
   await appFirestore.collection('products').doc(productId).set({
     status: 'active',
     name: 'Basic',
   });
 };
-
-/**
- * Creates an event with users
- */
-export async function createEvent(
-  eventId: string,
-  creatorId: string,
-  courseId: string
-) {
-  // create references
-  const courseRef = appFirestore.collection('courses').doc(courseId);
-  const creatorRef = appFirestore.collection('users').doc(creatorId);
-
-  // create event
-  const event: Event = {
-    name: 'testEvent',
-    private: false,
-    createdBy: creatorRef,
-    createdAt: getCurrentTime(),
-    userRefs: {
-      [creatorId]: creatorRef,
-    },
-    courseRef: courseRef,
-  };
-
-  await appFirestore.collection('events').doc(eventId).set(event);
-
-  // create private metadata
-  const eventPrivateMetadata: EventMetaData = {
-    numberOfHoles: 18,
-    maxBet: 5,
-    tees: 'I',
-  };
-
-  await appFirestore
-    .collection('events')
-    .doc(eventId)
-    .collection('private')
-    .doc('metadata')
-    .set(eventPrivateMetadata);
-}
-
-/**
- * Creates a course for events to be held at
- */
-export async function createCourse(courseId: string) {
-  const course: Course = {
-    name: 'testCourse',
-    public: false,
-    location: {
-      city: 'Birmingham',
-      state: 'Alabama',
-      country: 'United States',
-    },
-    createdAt: getCurrentTime(),
-  };
-  await appFirestore.collection('courses').doc(courseId).set(course);
-}
-
-/**
- * Creates a course for events to be held at
- */
-export async function createScorecard(scorecardId: string, userId: string) {
-  const userRef = appFirestore.collection('users').doc(userId);
-
-  const scorecard: ScoreCard = {
-    userRef: userRef,
-    createdAt: getCurrentTime(),
-  };
-  await appFirestore.collection('scorecards').doc(scorecardId).set(scorecard);
-}
 
 // export const helloWorld = functions.https.onRequest((request, response) => {
 //   functions.logger.info('Hello logs!', { structuredData: true });
