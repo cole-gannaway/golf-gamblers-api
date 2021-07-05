@@ -65,5 +65,8 @@ node_modules/
 # dotenv environment variables file
 .env
 
-#
+# Test info
 /test-data/*
+
+# Local files
+.DS_Store

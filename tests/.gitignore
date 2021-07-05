@@ -1,8 +1,0 @@
-# Config
-config/
-
-# Build directory
-dist/
-
-# Node dependencies
-node_modules/
