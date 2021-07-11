@@ -9,6 +9,7 @@ import { FirebaseConfig } from './config/firebase.config';
  */
 
 export const app = admin.initializeApp(FirebaseConfig);
-
+export const firestoreNameSpace = admin.firestore;
 export const firebaseFunctions = functions;
 export const LOGGER = functions.logger;
+export const appFirestore = app.firestore();
